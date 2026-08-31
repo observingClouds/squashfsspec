@@ -121,19 +121,23 @@ with SquashFSFileSystem("output.squash") as fs:   # write mode inferred
 
 ### Writing an Xarray Dataset Directly to SquashFS
 
-**Option 1 — URL one-liner** (write mode inferred; image created automatically):
+**Option 1 — URL one-liner** (write mode inferred; call `gc.collect()` to trigger
+the commit before reading back):
 
 ```python
+import gc
 import xarray as xr
 
 ds = xr.open_dataset("input.nc")
 
-# Write — the SquashFS image is produced automatically after the call.
+# Write — data is staged in a temp dir; the image is created on GC.
 ds.to_zarr(
     "squashfs:///zarr1.zarr",
     consolidated=False,
     storage_options={"fo": "output.squash"},
 )
+# Break zarr's asyncio reference cycles so mksquashfs runs.
+gc.collect()
 
 # Read back
 ds_back = xr.open_dataset(

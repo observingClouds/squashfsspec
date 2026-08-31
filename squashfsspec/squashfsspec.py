@@ -67,8 +67,8 @@ class SquashFSFileSystem(AbstractFileSystem):
         with SquashFSFileSystem("output.squash", mode="w") as fs:
             ds.to_zarr(fs.get_mapper("/"), mode="w")
 
-    One-liner URL write syntax (xarray infers write mode; the image is
-    produced automatically when the filesystem is garbage-collected)::
+    One-liner URL write syntax (xarray infers write mode; call
+    ``gc.collect()`` after ``to_zarr`` to trigger the commit)::
 
         ds.to_zarr(
             "squashfs:///data.zarr",
@@ -500,9 +500,8 @@ class SquashFSFileSystem(AbstractFileSystem):
             return
         if getattr(self, "_mode", None) == "w":
             if getattr(self, "_auto_commit", False):
-                # Auto-commit on GC so that one-liner URL writes work, e.g.:
-                #   ds.to_zarr("squashfs:///data.zarr",
-                #              backend_kwargs={"storage_options": {"fo": path}})
+                # Auto-commit: fires when the write-mode FS is garbage-collected
+                # (e.g. after an explicit gc.collect() call by the caller).
                 try:
                     self.commit()
                 except Exception:

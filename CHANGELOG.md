@@ -21,15 +21,17 @@
   )
   ```
 
-  The SquashFS image is produced automatically (via `mksquashfs`) when the
-  write-mode filesystem is garbage-collected after the call returns.
+  After `to_zarr` returns, call `gc.collect()` to break zarr's asyncio
+  reference cycles; the write-mode filesystem's `__del__` then runs
+  `mksquashfs` automatically.
 
 ### Fixes
 
 - Guard `SquashFSFileSystem.__del__` against `AttributeError` when `__init__`
   fails before `_closed` is set.
-- Fix `__del__` in write mode to auto-commit (call `mksquashfs`) on GC instead
-  of silently discarding staged data, enabling the URL one-liner write syntax.
+- Fix `__del__` in write mode to auto-commit (call `mksquashfs`) on GC
+  instead of silently discarding staged data, enabling the URL one-liner
+  write syntax (caller calls `gc.collect()` after `to_zarr`).
 
 ### Documentation
 
