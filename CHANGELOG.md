@@ -4,17 +4,37 @@
 
 ### Features
 
-- Add write mode
+- Add write mode to `SquashFSFileSystem`: mode is inferred automatically
+  (write when the target path does not exist; read otherwise) or forced via
+  `mode="w"`.
+- Add `discard()` method to abandon a write session without creating any file.
+- Context-manager `__exit__` discards staged data when an exception is raised,
+  ensuring no partial SquashFS image is left behind.
+- Support one-liner URL write syntax — xarray can now write directly to a new
+  SquashFS image without an explicit context manager:
+
+  ```python
+  ds.to_zarr(
+      "squashfs:///zarr1.zarr",
+      consolidated=False,
+      storage_options={"fo": "output.squash"},
+  )
+  ```
+
+  The SquashFS image is produced automatically (via `mksquashfs`) when the
+  write-mode filesystem is garbage-collected after the call returns.
 
 ### Fixes
 
 - Guard `SquashFSFileSystem.__del__` against `AttributeError` when `__init__`
   fails before `_closed` is set.
+- Fix `__del__` in write mode to auto-commit (call `mksquashfs`) on GC instead
+  of silently discarding staged data, enabling the URL one-liner write syntax.
 
 ### Documentation
 
-- Update `README.md` with write usage examples using the unified `squashfs`
-  protocol (no separate class or protocol needed).
+- Update `README.md` with both write usage patterns: URL one-liner and explicit
+  context manager.
 
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release

@@ -121,6 +121,32 @@ with SquashFSFileSystem("output.squash") as fs:   # write mode inferred
 
 ### Writing an Xarray Dataset Directly to SquashFS
 
+**Option 1 — URL one-liner** (write mode inferred; image created automatically):
+
+```python
+import xarray as xr
+
+ds = xr.open_dataset("input.nc")
+
+# Write — the SquashFS image is produced automatically after the call.
+ds.to_zarr(
+    "squashfs:///zarr1.zarr",
+    consolidated=False,
+    storage_options={"fo": "output.squash"},
+)
+
+# Read back
+ds_back = xr.open_dataset(
+    "squashfs:///zarr1.zarr",
+    engine="zarr",
+    consolidated=False,
+    backend_kwargs={"storage_options": {"fo": "output.squash"}},
+)
+print(ds_back)
+```
+
+**Option 2 — explicit context manager** (more control; image created on `__exit__`):
+
 ```python
 import xarray as xr
 from squashfsspec import SquashFSFileSystem

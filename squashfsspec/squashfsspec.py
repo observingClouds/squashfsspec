@@ -66,6 +66,24 @@ class SquashFSFileSystem(AbstractFileSystem):
 
         with SquashFSFileSystem("output.squash", mode="w") as fs:
             ds.to_zarr(fs.get_mapper("/"), mode="w")
+
+    One-liner URL write syntax (xarray infers write mode; the image is
+    produced automatically when the filesystem is garbage-collected)::
+
+        ds.to_zarr(
+            "squashfs:///data.zarr",
+            consolidated=False,
+            storage_options={"fo": "output.squash"},
+        )
+
+    One-liner URL read syntax::
+
+        ds = xr.open_dataset(
+            "squashfs:///data.zarr",
+            engine="zarr",
+            consolidated=False,
+            backend_kwargs={"storage_options": {"fo": "output.squash"}},
+        )
     """
 
     protocol = "squashfs"
@@ -109,6 +127,9 @@ class SquashFSFileSystem(AbstractFileSystem):
             self._staging_dir = tempfile.mkdtemp(prefix="squashfsspec_write_")
             self._local = LocalFileSystem(auto_mkdir=True)
             self._closed = False
+            # When True, __del__ will auto-commit if close() was never called.
+            # Set to False by discard() so GC doesn't re-create a discarded image.
+            self._auto_commit = True
         else:
             # ---- read mode ------------------------------------------------
             if fo is None:
@@ -437,6 +458,7 @@ class SquashFSFileSystem(AbstractFileSystem):
             raise ValueError("discard() is only available in write mode.")
         if self._closed:
             return
+        self._auto_commit = False
         self._closed = True
         shutil.rmtree(self._staging_dir, ignore_errors=True)
 
@@ -468,6 +490,7 @@ class SquashFSFileSystem(AbstractFileSystem):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._mode == "w" and exc_type is not None:
+            self._auto_commit = False
             self.discard()
         else:
             self.close()
@@ -476,8 +499,21 @@ class SquashFSFileSystem(AbstractFileSystem):
         if getattr(self, "_closed", False):
             return
         if getattr(self, "_mode", None) == "w":
-            # Best-effort staging cleanup — skip commit() during GC.
-            shutil.rmtree(getattr(self, "_staging_dir", ""), ignore_errors=True)
+            if getattr(self, "_auto_commit", False):
+                # Auto-commit on GC so that one-liner URL writes work, e.g.:
+                #   ds.to_zarr("squashfs:///data.zarr",
+                #              backend_kwargs={"storage_options": {"fo": path}})
+                try:
+                    self.commit()
+                except Exception:
+                    pass  # best-effort — don't propagate from __del__
+                finally:
+                    self._closed = True
+                    shutil.rmtree(
+                        getattr(self, "_staging_dir", ""), ignore_errors=True
+                    )
+            else:
+                shutil.rmtree(getattr(self, "_staging_dir", ""), ignore_errors=True)
             return
         self.close()
 
