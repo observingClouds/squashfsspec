@@ -4,6 +4,21 @@
 
 ### Features
 
+- Add `SquashFSStore`: a native zarr v3 `Store` subclass that stages writes in
+  a temporary local directory and runs `mksquashfs` automatically when the
+  context manager exits.  No `gc.collect()` calls or fsspec mapper wrappers are
+  required — the image is ready the moment the `with` block ends:
+
+  ```python
+  from squashfsspec import SquashFSStore
+
+  with SquashFSStore("output.squash") as store:
+      ds.to_zarr(store, consolidated=False)
+  ```
+
+  Multiple datasets can be written into sub-paths of the same archive using
+  `store.with_prefix("ds1.zarr")`.
+
 - Add write mode to `SquashFSFileSystem`: mode is inferred automatically
   (write when the target path does not exist; read otherwise) or forced via
   `mode="w"`.
@@ -35,8 +50,8 @@
 
 ### Documentation
 
-- Update `README.md` with both write usage patterns: URL one-liner and explicit
-  context manager.
+- Update `README.md` with all three write usage patterns: `SquashFSStore`
+  (recommended), `SquashFSFileSystem` context manager, and URL one-liner.
 
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release

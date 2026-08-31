@@ -10,6 +10,7 @@ import fsspec
 from dissect.squashfs import SquashFS
 from fsspec.implementations.local import LocalFileSystem
 from fsspec.spec import AbstractFileSystem
+from zarr.storage import LocalStore
 
 
 class SquashFSFileSystem(AbstractFileSystem):
@@ -515,6 +516,186 @@ class SquashFSFileSystem(AbstractFileSystem):
                 shutil.rmtree(getattr(self, "_staging_dir", ""), ignore_errors=True)
             return
         self.close()
+
+
+class SquashFSStore(LocalStore):
+    """Zarr v3 store that stages writes locally and packs them into a SquashFS image on close.
+
+    This is the cleanest alternative to :class:`SquashFSFileSystem` for zarr-based
+    write workflows.  It relies entirely on zarr's documented ``Store.close()``
+    contract — no ``gc.collect()`` calls or context-manager tricks are needed.
+
+    Parameters
+    ----------
+    path : str
+        Destination path for the SquashFS image (e.g. ``"output.squash"``).
+    compressor : str, optional
+        Compression algorithm passed to ``mksquashfs`` via ``-comp``.
+        Defaults to ``"gzip"``.
+    mksquashfs_args : list[str], optional
+        Extra CLI arguments forwarded verbatim to ``mksquashfs``.
+
+    Examples
+    --------
+    Write an xarray dataset directly into a SquashFS image::
+
+        import xarray as xr
+        from squashfsspec import SquashFSStore
+
+        ds = xr.open_dataset("input.nc")
+        with SquashFSStore("output.squash") as store:
+            ds.to_zarr(store, consolidated=False)
+
+    Read back::
+
+        ds_back = xr.open_dataset(
+            "squashfs:///",
+            engine="zarr",
+            consolidated=False,
+            backend_kwargs={"storage_options": {"fo": "output.squash"}},
+        )
+
+    Or write multiple datasets under sub-paths::
+
+        with SquashFSStore("archive.squash") as store:
+            ds1.to_zarr(store.with_prefix("ds1.zarr"), consolidated=False)
+            ds2.to_zarr(store.with_prefix("ds2.zarr"), consolidated=False)
+    """
+
+    def __init__(
+        self,
+        path: str,
+        compressor: str = "gzip",
+        mksquashfs_args: list | None = None,
+    ) -> None:
+        self._squash_path = os.path.abspath(path)
+        self._compressor = compressor
+        self._mksquashfs_args = mksquashfs_args or []
+        self._staging_dir = tempfile.mkdtemp(prefix="squashfsstore_")
+        self._committed = False
+        self._discarded = False
+        super().__init__(root=self._staging_dir)
+
+    # ------------------------------------------------------------------
+    # zarr Store protocol
+    # ------------------------------------------------------------------
+
+    def close(self) -> None:
+        """Pack the staging directory into the SquashFS image and clean up.
+
+        Called automatically by the context manager's ``__exit__``.
+        Raises ``RuntimeError`` if ``mksquashfs`` is not found or fails.
+        """
+        if self._committed or self._discarded:
+            super().close()
+            return
+        self._commit()
+        super().close()
+
+    def discard(self) -> None:
+        """Abandon staged writes without creating a SquashFS image.
+
+        The staging directory is removed and no output file is produced.
+        Safe to call multiple times.
+        """
+        if self._discarded or self._committed:
+            return
+        self._discarded = True
+        shutil.rmtree(self._staging_dir, ignore_errors=True)
+        self._is_open = False
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type is not None:
+            self.discard()
+        else:
+            self.close()
+
+    # ------------------------------------------------------------------
+    # Public helpers
+    # ------------------------------------------------------------------
+
+    def with_prefix(self, prefix: str) -> "SquashFSStore":
+        """Return a view of this store rooted at *prefix* (no copy/commit).
+
+        Useful for writing multiple datasets into sub-paths of the same archive::
+
+            with SquashFSStore("archive.squash") as store:
+                ds1.to_zarr(store.with_prefix("ds1.zarr"))
+                ds2.to_zarr(store.with_prefix("ds2.zarr"))
+
+        Parameters
+        ----------
+        prefix : str
+            Sub-directory path within the staging area.
+
+        Returns
+        -------
+        SquashFSStore
+            A new store instance whose ``root`` is ``<staging_dir>/<prefix>``.
+            Calling ``close()`` or ``discard()`` on the returned view is a
+            no-op — lifecycle is managed by the parent store.
+        """
+        import pathlib
+
+        sub_root = pathlib.Path(self._staging_dir) / prefix
+        sub_root.mkdir(parents=True, exist_ok=True)
+
+        # Create a view that shares the same staging area but is rooted at the
+        # sub-path.  We bypass the async _open() because the directory already
+        # exists; we just mark the store as open directly.
+        view = object.__new__(_SquashFSStoreView)
+        LocalStore.__init__(view, root=sub_root)
+        view._is_open = True  # directory exists — skip async _open()
+        return view
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    def _commit(self) -> None:
+        cmd = [
+            "mksquashfs",
+            self._staging_dir,
+            self._squash_path,
+            "-noappend",
+            "-comp",
+            self._compressor,
+        ] + self._mksquashfs_args
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "mksquashfs not found. Install squashfs-tools to enable writing."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(
+                f"mksquashfs failed (exit {exc.returncode}):\n"
+                f"{exc.stderr.decode(errors='replace')}"
+            ) from exc
+        finally:
+            shutil.rmtree(self._staging_dir, ignore_errors=True)
+        self._committed = True
+
+    def __del__(self) -> None:
+        # Best-effort cleanup of the staging directory on GC.
+        if not getattr(self, "_committed", False) and not getattr(
+            self, "_discarded", False
+        ):
+            shutil.rmtree(getattr(self, "_staging_dir", ""), ignore_errors=True)
+
+
+class _SquashFSStoreView(LocalStore):
+    """Internal view returned by ``SquashFSStore.with_prefix``.
+
+    ``close()`` and ``discard()`` are no-ops — lifecycle is managed by the
+    parent ``SquashFSStore`` instance.
+    """
+
+    def close(self) -> None:
+        self._is_open = False
+
+    def discard(self) -> None:
+        pass
 
 
 class _MemberFileProxy(io.IOBase):

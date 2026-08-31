@@ -121,27 +121,26 @@ with SquashFSFileSystem("output.squash") as fs:   # write mode inferred
 
 ### Writing an Xarray Dataset Directly to SquashFS
 
-**Option 1 — URL one-liner** (write mode inferred; call `gc.collect()` to trigger
-the commit before reading back):
+There are two ways to write xarray / zarr data directly to a SquashFS image.
+
+#### Option 1 — `SquashFSStore` (recommended)
+
+`SquashFSStore` is a native zarr v3 `Store` subclass.  It stages writes in a
+temporary local directory and runs `mksquashfs` automatically when the context
+manager exits — no `gc.collect()` calls or mapper wrappers needed:
 
 ```python
-import gc
 import xarray as xr
+from squashfsspec import SquashFSStore
 
 ds = xr.open_dataset("input.nc")
 
-# Write — data is staged in a temp dir; the image is created on GC.
-ds.to_zarr(
-    "squashfs:///zarr1.zarr",
-    consolidated=False,
-    storage_options={"fo": "output.squash"},
-)
-# Break zarr's asyncio reference cycles so mksquashfs runs.
-gc.collect()
+with SquashFSStore("output.squash") as store:
+    ds.to_zarr(store, consolidated=False)
 
 # Read back
 ds_back = xr.open_dataset(
-    "squashfs:///zarr1.zarr",
+    "squashfs:///",
     engine="zarr",
     consolidated=False,
     backend_kwargs={"storage_options": {"fo": "output.squash"}},
@@ -149,7 +148,20 @@ ds_back = xr.open_dataset(
 print(ds_back)
 ```
 
-**Option 2 — explicit context manager** (more control; image created on `__exit__`):
+Store multiple datasets under sub-paths using `with_prefix`:
+
+```python
+from squashfsspec import SquashFSStore
+
+with SquashFSStore("archive.squash") as store:
+    ds1.to_zarr(store.with_prefix("ds1.zarr"), consolidated=False)
+    ds2.to_zarr(store.with_prefix("ds2.zarr"), consolidated=False)
+```
+
+#### Option 2 — `SquashFSFileSystem` context manager
+
+For non-zarr writes or when you need the full fsspec API, use
+`SquashFSFileSystem` in write mode:
 
 ```python
 import xarray as xr
@@ -170,18 +182,46 @@ ds_back = xr.open_dataset(
 print(ds_back)
 ```
 
-You can also store multiple datasets at different paths inside one image:
+#### Option 3 — URL one-liner
+
+Write mode can also be triggered via the `squashfs://` URL.  Because zarr
+holds strong references to the filesystem object after `to_zarr` returns, call
+`gc.collect()` to break those reference cycles and trigger `mksquashfs`:
 
 ```python
-with SquashFSFileSystem("multi.squash") as fs:
-    ds1.to_zarr(fs.get_mapper("/ds1.zarr"), mode="w")
-    ds2.to_zarr(fs.get_mapper("/ds2.zarr"), mode="w")
+import gc
+import xarray as xr
+
+ds = xr.open_dataset("input.nc")
+
+ds.to_zarr(
+    "squashfs:///zarr1.zarr",
+    consolidated=False,
+    storage_options={"fo": "output.squash"},
+)
+# Break zarr's asyncio reference cycles so mksquashfs runs.
+gc.collect()
+
+# Read back
+ds_back = xr.open_dataset(
+    "squashfs:///zarr1.zarr",
+    engine="zarr",
+    consolidated=False,
+    backend_kwargs={"storage_options": {"fo": "output.squash"}},
+)
+print(ds_back)
 ```
+
+#### Compression
 
 By default `gzip` compression is used.  Pass `compressor="zstd"` (or any
 algorithm supported by your `mksquashfs` version) to change it:
 
 ```python
+with SquashFSStore("output.squash", compressor="zstd") as store:
+    ...
+
+# or with SquashFSFileSystem:
 with SquashFSFileSystem("output.squash", compressor="zstd") as fs:
     ...
 ```
