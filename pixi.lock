@@ -9463,8 +9463,8 @@ packages:
   timestamp: 1772548087157
 - pypi: .
   name: squashfsspec
-  version: 0.1.0
-  sha256: 7c7a5eda41305f98ee827060e14b76d6e9c32da76c84467b6549d08af1a96ded
+  version: 0.1.4
+  sha256: 725455e3cb44633331278c71e992d6760583f4e323138b52b5fd64267b0762df
   requires_dist:
   - fsspec
   - zarr

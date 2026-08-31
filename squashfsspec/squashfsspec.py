@@ -1,59 +1,144 @@
 # Standard library
 import io
+import os
+import shutil
+import subprocess
+import tempfile
 
 # Third-party
 import fsspec
 from dissect.squashfs import SquashFS
+from fsspec.implementations.local import LocalFileSystem
 from fsspec.spec import AbstractFileSystem
 
 
 class SquashFSFileSystem(AbstractFileSystem):
-    """Read-only fsspec filesystem for browsing SquashFS archives.
+    """fsspec filesystem for SquashFS archives — supports both reading and writing.
 
-    Inputs:
-    - fo: path or file-like object pointing to a SquashFS image.
-    - offset: byte offset into ``fo`` where the SquashFS image starts.
+    The operating mode is determined automatically from context:
 
-    Outputs:
-    - Standard fsspec directory listings and file-like readers for archive
-      members.
+    * **Read mode** (default): ``fo`` points to an *existing* SquashFS image.
+    * **Write mode**: ``fo`` (or ``target``) is a path that does *not* yet
+      exist on disk, or you pass ``mode="w"`` explicitly.
+
+    In write mode all file operations are staged in a temporary local
+    directory.  When ``close()`` is called (or the context manager exits
+    without an exception), ``mksquashfs`` is invoked to pack that directory
+    into the target SquashFS image.
+
+    Parameters
+    ----------
+    fo : str or file-like, optional
+        Path to an existing SquashFS image (read mode) **or** the destination
+        path for a new image (write mode).  For write mode you can also use
+        the ``target`` alias.
+    target : str, optional
+        Alias for ``fo`` in write mode.  Ignored when ``fo`` is given.
+    mode : {"r", "w"}, optional
+        Force read (``"r"``) or write (``"w"``) mode.  When omitted the mode
+        is inferred: if ``fo`` / ``target`` is a string pointing to a file
+        that does not yet exist the filesystem opens in write mode; otherwise
+        it opens in read mode.
+    offset : int, optional
+        Byte offset into ``fo`` where the SquashFS image starts (read mode
+        only).  Defaults to ``0``.
+    compressor : str, optional
+        Compression algorithm passed to ``mksquashfs`` via ``-comp`` (write
+        mode only).  Defaults to ``"gzip"``.
+    mksquashfs_args : list[str], optional
+        Extra CLI arguments forwarded verbatim to ``mksquashfs`` (write mode
+        only).
+
+    Examples
+    --------
+    Read an existing image::
+
+        fs = SquashFSFileSystem("data.squash")
+        print(fs.ls("/"))
+
+    Write a new image (mode inferred because the file does not exist)::
+
+        with SquashFSFileSystem("output.squash") as fs:
+            with fs.open("/hello.txt", "wb") as f:
+                f.write(b"Hello, SquashFS!")
+
+    Force write mode explicitly::
+
+        with SquashFSFileSystem("output.squash", mode="w") as fs:
+            ds.to_zarr(fs.get_mapper("/"), mode="w")
     """
 
     protocol = "squashfs"
     cachable = False  # codespell:ignore cachable
 
-    def __init__(self, fo=None, offset=0, **kwargs):
+    def __init__(
+        self,
+        fo=None,
+        target=None,
+        mode=None,
+        offset=0,
+        compressor="gzip",
+        mksquashfs_args=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
-        if fo is None:
-            # Try to get fo from kwargs if passed there
-            fo = kwargs.get("fo")
 
+        # Resolve the target path / file-like object.
         if fo is None:
-            raise ValueError(
-                "SquashFSFileSystem requires 'fo' (file-like object or path)"
-            )
+            fo = kwargs.get("fo") or target
 
-        self._close_fo = isinstance(fo, str)
-        if isinstance(fo, str):
-            self._fo_ref = fsspec.open(fo, "rb")
-            self.fo = self._fo_ref.open()
+        # Infer mode when not given explicitly.
+        if mode is None:
+            if isinstance(fo, str) and not os.path.exists(fo):
+                mode = "w"
+            else:
+                mode = "r"
+
+        self._mode = mode
+
+        if mode == "w":
+            # ---- write mode -----------------------------------------------
+            if fo is None:
+                raise ValueError(
+                    "SquashFSFileSystem in write mode requires a target path "
+                    "via 'fo' or 'target'."
+                )
+            self._target = os.fspath(fo)
+            self._compressor = compressor
+            self._mksquashfs_args = list(mksquashfs_args or [])
+            self._staging_dir = tempfile.mkdtemp(prefix="squashfsspec_write_")
+            self._local = LocalFileSystem(auto_mkdir=True)
+            self._closed = False
         else:
-            self.fo = fo
-            self._fo_ref = None
-        self.offset = offset
-        # SquashFS in dissect can take a file-like object
-        # We might need to wrap it if it has an offset
-        if self.offset != 0:
-            # Simple wrapper to handle offset if dissect doesn't
-            self.sfs = SquashFS(OffsetWrapper(self.fo, self.offset))
-        else:
-            self.sfs = SquashFS(self.fo)
-        self._closed = False
+            # ---- read mode ------------------------------------------------
+            if fo is None:
+                raise ValueError(
+                    "SquashFSFileSystem requires 'fo' (file-like object or path)"
+                )
+
+            self._close_fo = isinstance(fo, str)
+            if isinstance(fo, str):
+                self._fo_ref = fsspec.open(fo, "rb")
+                self.fo = self._fo_ref.open()
+            else:
+                self.fo = fo
+                self._fo_ref = None
+            self.offset = offset
+            if self.offset != 0:
+                self.sfs = SquashFS(OffsetWrapper(self.fo, self.offset))
+            else:
+                self.sfs = SquashFS(self.fo)
+            self._closed = False
+
+    # ------------------------------------------------------------------
+    # Shared helpers
+    # ------------------------------------------------------------------
 
     @property
     def closed(self):
-        """Return whether this filesystem should be treated as closed.
-        Checks both internal state and underlying file-like object."""
+        """Return whether this filesystem should be treated as closed."""
+        if self._mode == "w":
+            return self._closed
         return self._closed or bool(getattr(self.fo, "closed", False))
 
     def _check_closed(self):
@@ -87,6 +172,20 @@ class SquashFSFileSystem(AbstractFileSystem):
             path = "/" + path
         return path
 
+    # ------------------------------------------------------------------
+    # Write-mode internal helpers
+    # ------------------------------------------------------------------
+
+    def _stage_path(self, path):
+        """Translate an archive-internal path to an absolute staging path."""
+        path = self._strip_protocol(path)
+        rel = path.lstrip("/")
+        return os.path.join(self._staging_dir, rel) if rel else self._staging_dir
+
+    # ------------------------------------------------------------------
+    # AbstractFileSystem interface — dispatches on mode
+    # ------------------------------------------------------------------
+
     def ls(self, path, detail=True, **kwargs):
         """List members at ``path``.
 
@@ -98,8 +197,12 @@ class SquashFSFileSystem(AbstractFileSystem):
         - ``list[dict]`` when ``detail=True`` else ``list[str]``.
         """
         self._check_closed()
-        path = self._strip_protocol(path)
+        if self._mode == "w":
+            return self._ls_write(path, detail=detail)
+        return self._ls_read(path, detail=detail)
 
+    def _ls_read(self, path, detail=True):
+        path = self._strip_protocol(path)
         try:
             entry = self.sfs.get(path)
         except Exception:
@@ -131,8 +234,36 @@ class SquashFSFileSystem(AbstractFileSystem):
                 ]
             return [path.lstrip("/")]
 
+    def _ls_write(self, path, detail=True):
+        stage = self._stage_path(path)
+        if not os.path.exists(stage):
+            raise FileNotFoundError(path)
+
+        strip = len(self._staging_dir.rstrip("/")) + 1
+        if os.path.isfile(stage):
+            rel = stage[strip:]
+            if detail:
+                return [{"name": rel, "size": os.path.getsize(stage), "type": "file"}]
+            return [rel]
+
+        out = []
+        for name in os.listdir(stage):
+            child = os.path.join(stage, name)
+            rel = child[strip:]
+            if detail:
+                out.append(
+                    {
+                        "name": rel,
+                        "size": os.path.getsize(child) if os.path.isfile(child) else 0,
+                        "type": "directory" if os.path.isdir(child) else "file",
+                    }
+                )
+            else:
+                out.append(rel)
+        return out
+
     def info(self, path, **kwargs):
-        """Return metadata for one archive member.
+        """Return metadata for one archive member or staged path.
 
         Input:
         - path: archive-internal path.
@@ -141,6 +272,18 @@ class SquashFSFileSystem(AbstractFileSystem):
         - Dict with ``name``, ``size``, and ``type``.
         """
         self._check_closed()
+        if self._mode == "w":
+            stage = self._stage_path(path)
+            if not os.path.exists(stage):
+                raise FileNotFoundError(path)
+            strip = len(self._staging_dir.rstrip("/")) + 1
+            rel = stage[strip:] if len(stage) > len(self._staging_dir) else ""
+            return {
+                "name": rel,
+                "size": os.path.getsize(stage) if os.path.isfile(stage) else 0,
+                "type": "directory" if os.path.isdir(stage) else "file",
+            }
+
         path = self._strip_protocol(path)
         try:
             entry = self.sfs.get(path)
@@ -155,6 +298,8 @@ class SquashFSFileSystem(AbstractFileSystem):
 
     def exists(self, path, **kwargs):
         self._check_closed()
+        if self._mode == "w":
+            return os.path.exists(self._stage_path(path))
         path = self._strip_protocol(path)
         try:
             self.sfs.get(path)
@@ -164,6 +309,8 @@ class SquashFSFileSystem(AbstractFileSystem):
 
     def isdir(self, path):
         self._check_closed()
+        if self._mode == "w":
+            return os.path.isdir(self._stage_path(path))
         path = self._strip_protocol(path)
         try:
             return self.sfs.get(path).is_dir()
@@ -172,48 +319,166 @@ class SquashFSFileSystem(AbstractFileSystem):
 
     def isfile(self, path):
         self._check_closed()
+        if self._mode == "w":
+            return os.path.isfile(self._stage_path(path))
         path = self._strip_protocol(path)
         try:
             return not self.sfs.get(path).is_dir()
         except Exception:
             return False
 
+    def mkdir(self, path, create_parents=True, **kwargs):
+        """Create a directory in the staging area (write mode only).
+
+        Input:
+        - path: archive-internal directory path.
+        - create_parents: if True (default), create intermediate directories.
+        """
+        self._check_closed()
+        if self._mode != "w":
+            raise ValueError("mkdir is not supported in read mode.")
+        stage = self._stage_path(path)
+        os.makedirs(stage, exist_ok=True) if create_parents else os.mkdir(stage)
+
+    def makedirs(self, path, exist_ok=False):
+        """Recursively create directories in the staging area (write mode only)."""
+        self._check_closed()
+        if self._mode != "w":
+            raise ValueError("makedirs is not supported in read mode.")
+        os.makedirs(self._stage_path(path), exist_ok=exist_ok)
+
+    def rm(self, path, recursive=False, maxdepth=None):
+        """Remove a file or directory from the staging area (write mode only).
+
+        Input:
+        - path: archive-internal path or list of paths.
+        - recursive: if True, remove directories and their contents.
+        """
+        self._check_closed()
+        if self._mode != "w":
+            raise ValueError("rm is not supported in read mode.")
+        paths = [path] if isinstance(path, str) else path
+        for p in paths:
+            stage = self._stage_path(p)
+            if os.path.isdir(stage):
+                if recursive:
+                    shutil.rmtree(stage)
+                else:
+                    os.rmdir(stage)
+            elif os.path.exists(stage):
+                os.remove(stage)
+
     def _open(self, path, mode="rb", **kwargs):
-        """Open an archive member for binary reading.
+        """Open an archive member or staging file.
+
+        In read mode ``mode`` must be ``"rb"``.  In write mode any standard
+        file mode (``"rb"``, ``"wb"``, ``"ab"`` …) is accepted.
 
         Input:
         - path: archive-internal file path.
-        - mode: must be ``rb``.
+        - mode: file open mode.
 
         Output:
-        - File-like object for reading bytes.
+        - File-like object.
         """
         self._check_closed()
+        if self._mode == "w":
+            stage = self._stage_path(path)
+            if "w" in mode or "a" in mode or "x" in mode:
+                os.makedirs(os.path.dirname(stage), exist_ok=True)
+            return open(stage, mode)  # noqa: PTH123
+
         if mode != "rb":
             raise ValueError("ReadOnly filesystem")
         path = self._strip_protocol(path)
         entry = self.sfs.get(path)
         return _MemberFileProxy(entry.open())
 
-    def close(self):
-        """Close filesystem resources and owned archive handle."""
+    # ------------------------------------------------------------------
+    # Write-mode commit / discard
+    # ------------------------------------------------------------------
+
+    def commit(self):
+        """Pack the staging directory into the target SquashFS image (write mode only).
+
+        Calls ``mksquashfs <staging_dir> <target> -noappend -comp <compressor>``
+        plus any extra args supplied at construction time.
+
+        Raises:
+        - ``RuntimeError`` if ``mksquashfs`` is not found or exits non-zero.
+        - ``ValueError`` if called in read mode.
+        """
+        if self._mode != "w":
+            raise ValueError("commit() is only available in write mode.")
+        cmd = [
+            "mksquashfs",
+            self._staging_dir,
+            self._target,
+            "-noappend",
+            "-comp",
+            self._compressor,
+        ] + self._mksquashfs_args
+        try:
+            result = subprocess.run(cmd, check=True, capture_output=True)
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "mksquashfs not found. Install squashfs-tools to enable writing."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(
+                f"mksquashfs failed (exit {exc.returncode}):\n"
+                f"{exc.stderr.decode(errors='replace')}"
+            ) from exc
+        return result
+
+    def discard(self):
+        """Discard all staged writes without creating a SquashFS image (write mode only)."""
+        if self._mode != "w":
+            raise ValueError("discard() is only available in write mode.")
         if self._closed:
             return
         self._closed = True
-        try:
-            if hasattr(self.sfs, "close"):
-                self.sfs.close()
-        finally:
-            if self._close_fo and self.fo is not None:
-                self.fo.close()
+        shutil.rmtree(self._staging_dir, ignore_errors=True)
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def close(self):
+        """Close filesystem resources."""
+        if self._closed:
+            return
+        if self._mode == "w":
+            try:
+                self.commit()
+            finally:
+                self._closed = True
+                shutil.rmtree(self._staging_dir, ignore_errors=True)
+        else:
+            self._closed = True
+            try:
+                if hasattr(self.sfs, "close"):
+                    self.sfs.close()
+            finally:
+                if self._close_fo and self.fo is not None:
+                    self.fo.close()
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if self._mode == "w" and exc_type is not None:
+            self.discard()
+        else:
+            self.close()
 
     def __del__(self):
+        if getattr(self, "_closed", False):
+            return
+        if getattr(self, "_mode", None) == "w":
+            # Best-effort staging cleanup — skip commit() during GC.
+            shutil.rmtree(getattr(self, "_staging_dir", ""), ignore_errors=True)
+            return
         self.close()
 
 
@@ -299,3 +564,5 @@ class OffsetWrapper:
 
     def close(self):
         return self.fo.close()
+
+

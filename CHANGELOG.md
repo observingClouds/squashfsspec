@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## Unreleased
+
+### Features
+
+- Add write mode
+
+### Fixes
+
+- Guard `SquashFSFileSystem.__del__` against `AttributeError` when `__init__`
+  fails before `_closed` is set.
+
+### Documentation
+
+- Update `README.md` with write usage examples using the unified `squashfs`
+  protocol (no separate class or protocol needed).
+
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
 
