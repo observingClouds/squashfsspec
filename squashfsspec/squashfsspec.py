@@ -211,7 +211,7 @@ class SquashFSFileSystem(AbstractFileSystem):
         if entry.is_dir():
             out = []
             for name, child in entry.listdir().items():
-                child_path = (path.rstrip("/") + "/" + name).lstrip("/")
+                child_path = path.rstrip("/") + "/" + name
                 if detail:
                     out.append(
                         {
@@ -227,39 +227,39 @@ class SquashFSFileSystem(AbstractFileSystem):
             if detail:
                 return [
                     {
-                        "name": path.lstrip("/"),
+                        "name": path,
                         "size": entry.size,
                         "type": "file",
                     }
                 ]
-            return [path.lstrip("/")]
+            return [path]
 
     def _ls_write(self, path, detail=True):
         stage = self._stage_path(path)
         if not os.path.exists(stage):
             raise FileNotFoundError(path)
 
-        strip = len(self._staging_dir.rstrip("/")) + 1
+        strip = len(self._staging_dir.rstrip("/"))
         if os.path.isfile(stage):
-            rel = stage[strip:]
+            archive_path = stage[strip:] or "/"
             if detail:
-                return [{"name": rel, "size": os.path.getsize(stage), "type": "file"}]
-            return [rel]
+                return [{"name": archive_path, "size": os.path.getsize(stage), "type": "file"}]
+            return [archive_path]
 
         out = []
         for name in os.listdir(stage):
             child = os.path.join(stage, name)
-            rel = child[strip:]
+            archive_path = child[strip:] or "/"
             if detail:
                 out.append(
                     {
-                        "name": rel,
+                        "name": archive_path,
                         "size": os.path.getsize(child) if os.path.isfile(child) else 0,
                         "type": "directory" if os.path.isdir(child) else "file",
                     }
                 )
             else:
-                out.append(rel)
+                out.append(archive_path)
         return out
 
     def info(self, path, **kwargs):
@@ -276,10 +276,10 @@ class SquashFSFileSystem(AbstractFileSystem):
             stage = self._stage_path(path)
             if not os.path.exists(stage):
                 raise FileNotFoundError(path)
-            strip = len(self._staging_dir.rstrip("/")) + 1
-            rel = stage[strip:] if len(stage) > len(self._staging_dir) else ""
+            strip = len(self._staging_dir.rstrip("/"))
+            archive_path = stage[strip:] or "/"
             return {
-                "name": rel,
+                "name": archive_path,
                 "size": os.path.getsize(stage) if os.path.isfile(stage) else 0,
                 "type": "directory" if os.path.isdir(stage) else "file",
             }
@@ -291,7 +291,7 @@ class SquashFSFileSystem(AbstractFileSystem):
             raise FileNotFoundError(path)
 
         return {
-            "name": path.lstrip("/"),
+            "name": path,
             "size": entry.size if not entry.is_dir() else 0,
             "type": "directory" if entry.is_dir() else "file",
         }
