@@ -21,13 +21,13 @@ repos:
         description: Require specific codes on noqa comments
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
       - id: codespell
         description: Check for spelling errors
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.4
+    rev: v0.16.6
     hooks:
       - id: ruff-check
         args: [--fix]
