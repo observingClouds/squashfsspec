@@ -61,9 +61,7 @@ ds = xr.open_dataset(
     "squashfs:///",
     engine="zarr",
     consolidated=False,  # Set to True if your Zarr store is consolidated
-    backend_kwargs={
-        "storage_options": {"fo": squashfs_path}
-    },
+    backend_kwargs={"storage_options": {"fo": squashfs_path}},
 )
 
 print(ds)
