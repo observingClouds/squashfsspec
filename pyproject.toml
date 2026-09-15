@@ -33,7 +33,7 @@ where = ["."]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["osx-64", "linux-64"]
+platforms = ["osx-64", "osx-arm64", "linux-64"]
 
 [tool.pixi.dependencies]
 dask = ">=2026.3.0,<2027"
