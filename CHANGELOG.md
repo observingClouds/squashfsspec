@@ -7,6 +7,7 @@
 - Fix `requires-python` to `>=3.10` so the package installs on Python 3.14 ([#29](https://github.com/observingClouds/squashfsspec/pull/29))
 - Accept `os.PathLike` objects such as `pathlib.Path` for `fo` ([#39](https://github.com/observingClouds/squashfsspec/pull/39))
 - Raise `IsADirectoryError` instead of leaking dissect's `NotAFileError` when opening a directory ([#40](https://github.com/observingClouds/squashfsspec/pull/40))
+- Make the `offset` parameter work: `OffsetWrapper` now positions the stream at the image start and reports image-relative positions from `seek` ([#41](https://github.com/observingClouds/squashfsspec/pull/41))
 
 ### Dependencies
 
