@@ -74,14 +74,19 @@ def test_filelike_input_is_not_closed_by_filesystem(image):
     assert not buf.closed
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="pathlib.Path is passed to dissect unchanged and fails with "
-    "'Invalid squashfs superblock'; only str paths are recognised",
-)
 def test_pathlike_input(image):
     with SquashFSFileSystem(pathlib.Path(image)) as fs:
         assert fs.isfile("a.txt")
+        assert fs.cat_file("a.txt") == A_CONTENT
+        # A path, like a str, is opened by the filesystem and owned by it.
+        assert not fs.fo.closed
+    assert fs.fo.closed
+
+
+def test_pathlike_input_via_fsspec(image):
+    fs = fsspec.filesystem("squashfs", fo=pathlib.Path(image))
+    assert fs.isfile("a.txt")
+    fs.close()
 
 
 # --------------------------------------------------------------------------
