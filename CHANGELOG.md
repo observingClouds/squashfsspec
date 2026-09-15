@@ -14,6 +14,10 @@
 
 - Run the test matrix on macOS (`macos-latest`) in addition to Linux; add `osx-arm64` to the pixi platforms ([#35](https://github.com/observingClouds/squashfsspec/pull/35))
 
+### Changes
+
+- Add MIT `LICENSE` file and declare the license in `pyproject.toml` ([#30](https://github.com/observingClouds/squashfsspec/pull/30))
+
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
 
