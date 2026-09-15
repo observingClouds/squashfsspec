@@ -116,13 +116,16 @@ class SquashFSFileSystem(AbstractFileSystem):
 
     @classmethod
     def _strip_protocol(cls, path):
-        """Normalize paths to absolute archive-internal paths.
+        """Normalize paths to archive-relative paths.
 
         Input:
         - path: string path that may include protocol prefixes.
 
         Output:
-        - Path string rooted at ``/`` within the SquashFS image.
+        - Path string relative to the image root, without leading or
+          trailing slashes. The root itself is the empty string. This is
+          the same convention fsspec's archive filesystems use, and it
+          matches the names returned by ``ls``, ``info`` and ``find``.
         """
         path = super()._strip_protocol(path)
 
@@ -137,9 +140,7 @@ class SquashFSFileSystem(AbstractFileSystem):
             # Handle cases like some_path://inner_path
             path = path.split("://", 1)[1]
 
-        if not path.startswith("/"):
-            path = "/" + path
-        return path
+        return path.strip("/")
 
     def ls(self, path, detail=True, **kwargs):
         """List members at ``path``.
@@ -158,7 +159,7 @@ class SquashFSFileSystem(AbstractFileSystem):
         if entry.is_dir():
             out = []
             for name, child in entry.listdir().items():
-                child_path = (path.rstrip("/") + "/" + name).lstrip("/")
+                child_path = f"{path}/{name}" if path else name
                 if detail:
                     try:
                         target = self._resolve(child, child_path)
@@ -174,8 +175,8 @@ class SquashFSFileSystem(AbstractFileSystem):
             return out
         else:
             if detail:
-                return [{"name": path.lstrip("/"), **self._info_fields(entry)}]
-            return [path.lstrip("/")]
+                return [{"name": path, **self._info_fields(entry)}]
+            return [path]
 
     def info(self, path, **kwargs):
         """Return metadata for one archive member.
@@ -189,7 +190,7 @@ class SquashFSFileSystem(AbstractFileSystem):
         self._check_closed()
         path = self._strip_protocol(path)
         entry = self._get(path)
-        return {"name": path.lstrip("/"), **self._info_fields(entry)}
+        return {"name": path, **self._info_fields(entry)}
 
     def exists(self, path, **kwargs):
         self._check_closed()
