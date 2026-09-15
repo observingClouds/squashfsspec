@@ -9,6 +9,8 @@ readme = "README.md"
 description = "A simple fsspec driver for SquashFS files"
 license = "MIT"
 license-files = [ "LICENSE" ]
+authors = [ { name = "squashfsspec developers" } ]
+keywords = [ "fsspec", "squashfs", "filesystem", "archive", "zarr", "xarray" ]
 requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -26,6 +28,12 @@ optional-dependencies.test = [
   "zarr",
 ]
 optional-dependencies.dev = [ "squashfsspec[test]" ]
+
+[project.urls]
+Homepage = "https://github.com/observingClouds/squashfsspec"
+Repository = "https://github.com/observingClouds/squashfsspec"
+Issues = "https://github.com/observingClouds/squashfsspec/issues"
+Changelog = "https://github.com/observingClouds/squashfsspec/blob/main/CHANGELOG.md"
 
 [project.entry-points."fsspec.specs"]
 squashfs = "squashfsspec:SquashFSFileSystem"
