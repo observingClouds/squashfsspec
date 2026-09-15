@@ -192,12 +192,20 @@ class SquashFSFileSystem(AbstractFileSystem):
 
         Output:
         - File-like object for reading bytes.
+
+        Raises ``FileNotFoundError`` if ``path`` does not exist and
+        ``IsADirectoryError`` if it names a directory.
         """
         self._check_closed()
         if mode != "rb":
             raise ValueError("ReadOnly filesystem")
         path = self._strip_protocol(path)
-        entry = self.sfs.get(path)
+        try:
+            entry = self.sfs.get(path)
+        except Exception as exc:
+            raise FileNotFoundError(path) from exc
+        if entry.is_dir():
+            raise IsADirectoryError(path)
         return _MemberFileProxy(entry.open())
 
     def close(self):

@@ -166,14 +166,13 @@ def test_missing_paths_raise_filenotfound(fs):
         fs.open("sub/missing.txt")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="opening a directory leaks dissect's NotAFileError instead of "
-    "IsADirectoryError",
-)
 def test_open_directory_raises_isadirectoryerror(fs):
     with pytest.raises(IsADirectoryError):
         fs.open("sub")
+    with pytest.raises(IsADirectoryError):
+        fs.open("/")
+    with pytest.raises(IsADirectoryError):
+        fs.cat_file("sub/nested")
 
 
 # --------------------------------------------------------------------------
