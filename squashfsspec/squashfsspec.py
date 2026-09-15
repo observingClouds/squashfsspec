@@ -297,7 +297,6 @@ class OffsetWrapper:
         else:
             pos = self.fo.seek(offset, whence)
             if pos < self.offset:
-                # Never expose bytes before the image start.
                 pos = self.fo.seek(self.offset)
         return pos - self.offset
 
