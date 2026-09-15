@@ -65,6 +65,55 @@ class SquashFSFileSystem(AbstractFileSystem):
         if self.closed:
             raise ValueError("I/O operation on closed filesystem.")
 
+    _MAX_SYMLINK_DEPTH = 40
+
+    def _resolve(self, entry, path):
+        """Follow symlinks until a non-link inode is reached.
+
+        Input:
+        - entry: dissect inode, possibly a symlink.
+        - path: archive path used for error messages.
+
+        Output:
+        - The inode the link chain ends at.
+
+        Raises ``FileNotFoundError`` for dangling links and for chains longer
+        than ``_MAX_SYMLINK_DEPTH`` (the same limit as the Linux kernel).
+        """
+        depth = 0
+        while entry.is_symlink():
+            depth += 1
+            if depth > self._MAX_SYMLINK_DEPTH:
+                raise FileNotFoundError(
+                    f"{path}: too many levels of symbolic links"
+                )
+            try:
+                entry = entry.link_inode
+            except Exception as exc:
+                raise FileNotFoundError(
+                    f"{path}: dangling symlink to {entry.link!r}"
+                ) from exc
+        return entry
+
+    def _get(self, path):
+        """Return the inode at ``path`` with a trailing symlink resolved.
+
+        Raises ``FileNotFoundError`` when the path or the link target does
+        not exist.
+        """
+        try:
+            entry = self.sfs.get(path)
+        except Exception as exc:
+            raise FileNotFoundError(path) from exc
+        return self._resolve(entry, path)
+
+    @staticmethod
+    def _info_fields(entry):
+        """Return the ``size`` and ``type`` fields for a resolved inode."""
+        if entry.is_dir():
+            return {"size": 0, "type": "directory"}
+        return {"size": entry.size, "type": "file"}
+
     @classmethod
     def _strip_protocol(cls, path):
         """Normalize paths to absolute archive-internal paths.
@@ -104,36 +153,28 @@ class SquashFSFileSystem(AbstractFileSystem):
         """
         self._check_closed()
         path = self._strip_protocol(path)
-
-        try:
-            entry = self.sfs.get(path)
-        except Exception:
-            raise FileNotFoundError(path)
+        entry = self._get(path)
 
         if entry.is_dir():
             out = []
             for name, child in entry.listdir().items():
                 child_path = (path.rstrip("/") + "/" + name).lstrip("/")
                 if detail:
-                    out.append(
-                        {
-                            "name": child_path,
-                            "size": child.size if not child.is_dir() else 0,
-                            "type": "directory" if child.is_dir() else "file",
-                        }
-                    )
+                    try:
+                        target = self._resolve(child, child_path)
+                    except FileNotFoundError:
+                        # Dangling symlink: list it, but as neither file
+                        # nor directory, like fsspec's local filesystem.
+                        fields = {"size": 0, "type": "other"}
+                    else:
+                        fields = self._info_fields(target)
+                    out.append({"name": child_path, **fields})
                 else:
                     out.append(child_path)
             return out
         else:
             if detail:
-                return [
-                    {
-                        "name": path.lstrip("/"),
-                        "size": entry.size,
-                        "type": "file",
-                    }
-                ]
+                return [{"name": path.lstrip("/"), **self._info_fields(entry)}]
             return [path.lstrip("/")]
 
     def info(self, path, **kwargs):
@@ -147,40 +188,32 @@ class SquashFSFileSystem(AbstractFileSystem):
         """
         self._check_closed()
         path = self._strip_protocol(path)
-        try:
-            entry = self.sfs.get(path)
-        except Exception:
-            raise FileNotFoundError(path)
-
-        return {
-            "name": path.lstrip("/"),
-            "size": entry.size if not entry.is_dir() else 0,
-            "type": "directory" if entry.is_dir() else "file",
-        }
+        entry = self._get(path)
+        return {"name": path.lstrip("/"), **self._info_fields(entry)}
 
     def exists(self, path, **kwargs):
         self._check_closed()
         path = self._strip_protocol(path)
         try:
-            self.sfs.get(path)
+            self._get(path)
             return True
-        except Exception:
+        except FileNotFoundError:
             return False
 
     def isdir(self, path):
         self._check_closed()
         path = self._strip_protocol(path)
         try:
-            return self.sfs.get(path).is_dir()
-        except Exception:
+            return self._get(path).is_dir()
+        except FileNotFoundError:
             return False
 
     def isfile(self, path):
         self._check_closed()
         path = self._strip_protocol(path)
         try:
-            return not self.sfs.get(path).is_dir()
-        except Exception:
+            return not self._get(path).is_dir()
+        except FileNotFoundError:
             return False
 
     def _open(self, path, mode="rb", **kwargs):
@@ -200,10 +233,7 @@ class SquashFSFileSystem(AbstractFileSystem):
         if mode != "rb":
             raise ValueError("ReadOnly filesystem")
         path = self._strip_protocol(path)
-        try:
-            entry = self.sfs.get(path)
-        except Exception as exc:
-            raise FileNotFoundError(path) from exc
+        entry = self._get(path)
         if entry.is_dir():
             raise IsADirectoryError(path)
         return _MemberFileProxy(entry.open())

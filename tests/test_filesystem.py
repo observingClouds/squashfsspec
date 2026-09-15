@@ -301,15 +301,70 @@ def test_multiple_members_open_concurrently(fs):
         assert fb.read() == B_CONTENT[5:]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="symlinks are reported as regular files with the target path "
-    "length as size, and opening them raises NotAFileError",
-)
 def test_symlink_resolves_to_target(fs):
     with fs.open("link.txt") as f:
         assert f.read() == A_CONTENT
-    assert fs.info("link.txt")["size"] == len(A_CONTENT)
+    assert fs.info("link.txt") == {
+        "name": "link.txt",
+        "size": len(A_CONTENT),
+        "type": "file",
+    }
+    assert fs.isfile("link.txt")
+    assert not fs.isdir("link.txt")
+    (entry,) = [e for e in fs.ls("/") if e["name"] == "link.txt"]
+    assert entry["size"] == len(A_CONTENT)
+    assert entry["type"] == "file"
+
+
+@pytest.fixture
+def linky_image(tmp_path, make_squashfs) -> str:
+    """Image with directory, absolute, chained and dangling symlinks."""
+    root = tmp_path / "linky"
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "f.txt").write_bytes(A_CONTENT)
+    (root / "dirlink").symlink_to("data")
+    (root / "abslink").symlink_to("/data/f.txt")
+    (root / "chain1").symlink_to("chain2")
+    (root / "chain2").symlink_to("data/f.txt")
+    (root / "dangling").symlink_to("nowhere")
+    (root / "loop_a").symlink_to("loop_b")
+    (root / "loop_b").symlink_to("loop_a")
+    return make_squashfs(root, "linky.squash")
+
+
+def test_symlink_to_directory(linky_image):
+    with SquashFSFileSystem(linky_image) as fs:
+        assert fs.isdir("dirlink")
+        assert fs.info("dirlink")["type"] == "directory"
+        assert fs.ls("dirlink", detail=False) == ["dirlink/f.txt"]
+        assert fs.cat_file("dirlink/f.txt") == A_CONTENT
+
+
+def test_symlink_absolute_and_chained(linky_image):
+    with SquashFSFileSystem(linky_image) as fs:
+        assert fs.cat_file("abslink") == A_CONTENT
+        assert fs.cat_file("chain1") == A_CONTENT
+        assert fs.info("chain1")["size"] == len(A_CONTENT)
+
+
+def test_dangling_symlink(linky_image):
+    with SquashFSFileSystem(linky_image) as fs:
+        assert not fs.exists("dangling")
+        assert not fs.isfile("dangling")
+        with pytest.raises(FileNotFoundError, match="dangling"):
+            fs.open("dangling")
+        # Listing the parent still works and reports the entry as 'other'.
+        (entry,) = [e for e in fs.ls("/") if e["name"] == "dangling"]
+        assert entry == {"name": "dangling", "size": 0, "type": "other"}
+
+
+def test_symlink_loop(linky_image):
+    with SquashFSFileSystem(linky_image) as fs:
+        with pytest.raises(FileNotFoundError, match="too many levels"):
+            fs.info("loop_a")
+        assert not fs.exists("loop_a")
+        (entry,) = [e for e in fs.ls("/") if e["name"] == "loop_a"]
+        assert entry["type"] == "other"
 
 
 # --------------------------------------------------------------------------
