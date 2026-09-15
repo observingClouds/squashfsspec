@@ -11,9 +11,11 @@ This document describes the steps to release a new version of `squashfsspec` to 
 
 ### 1. Update the Changelog
 
-In `CHANGELOG.md`, add a new section at the top for the new version with a summary of all changes since the last release. Follow the existing format:
+In `CHANGELOG.md`, rename the `## Unreleased` section to the new version and date, and add a fresh, empty `## Unreleased` section above it. Follow the existing format:
 
 ```markdown
+## Unreleased
+
 ## vX.Y.Z (YYYY-MM-DD)
 
 ### Fixes
@@ -22,6 +24,8 @@ In `CHANGELOG.md`, add a new section at the top for the new version with a summa
 ### Changes
 - ...
 ```
+
+`CHANGELOG.md` must always contain an `## Unreleased` section: every pull request adds its entry there, and the [Dependabot changelog workflow](.github/workflows/dependabot-auto-changelog.yml) aborts without it. A pre-commit hook fails if the section is missing.
 
 ### 2. Bump the Version Number
 

@@ -34,3 +34,13 @@ repos:
         description: Lint Python code with Ruff
       - id: ruff-format
         description: Format Python code with Ruff
+
+  - repo: local
+    hooks:
+      - id: changelog-unreleased-section
+        name: CHANGELOG.md keeps an "## Unreleased" section
+        description: Every PR adds its entry there and the Dependabot changelog writer aborts without it
+        language: pygrep
+        entry: '^## \[?[Uu]nreleased\]?'
+        args: [--negate]
+        files: ^CHANGELOG\.md$
