@@ -369,7 +369,6 @@ def test_member_outlives_filesystem_reference(image):
 def test_offset_wrapper_translates_absolute_seeks():
     raw = io.BytesIO(b"0123456789")
     wrapped = OffsetWrapper(raw, 5)
-    # Construction positions the stream at the image start.
     assert wrapped.tell() == 0
     assert wrapped.read(2) == b"56"
     assert wrapped.tell() == 2
