@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixes
+
+- Fix `requires-python` to `>=3.10` so the package installs on Python 3.14 ([#29](https://github.com/observingClouds/squashfsspec/pull/29))
+
 ### Dependencies
 
 - Remove `zarr` from runtime dependencies and add a `test` extra with `pytest`, `numpy`, `xarray` and `zarr` ([#31](https://github.com/observingClouds/squashfsspec/pull/31))
