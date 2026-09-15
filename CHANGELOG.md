@@ -8,6 +8,7 @@
 - Accept `os.PathLike` objects such as `pathlib.Path` for `fo` ([#39](https://github.com/observingClouds/squashfsspec/pull/39))
 - Raise `IsADirectoryError` instead of leaking dissect's `NotAFileError` when opening a directory ([#40](https://github.com/observingClouds/squashfsspec/pull/40))
 - Make the `offset` parameter work: `OffsetWrapper` now positions the stream at the image start and reports image-relative positions from `seek` ([#41](https://github.com/observingClouds/squashfsspec/pull/41))
+- Resolve symlinks: links to files read and report like the file, links to directories list like the directory, dangling and looping links raise `FileNotFoundError` and show as type `other` in listings ([#38](https://github.com/observingClouds/squashfsspec/pull/38))
 - Keep the filesystem alive while member files are open, so `fsspec.open(url).open().read()` no longer fails with "seek of closed file" ([#42](https://github.com/observingClouds/squashfsspec/pull/42))
 
 ### Dependencies
