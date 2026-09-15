@@ -78,7 +78,6 @@ def test_pathlike_input(image):
     with SquashFSFileSystem(pathlib.Path(image)) as fs:
         assert fs.isfile("a.txt")
         assert fs.cat_file("a.txt") == A_CONTENT
-        # A path, like a str, is opened by the filesystem and owned by it.
         assert not fs.fo.closed
     assert fs.fo.closed
 
