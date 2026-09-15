@@ -286,8 +286,6 @@ class OffsetWrapper:
             raise ValueError(f"offset must be non-negative, got {offset}")
         self.fo = fo
         self.offset = offset
-        # Position the stream at the start of the embedded image so that
-        # consumers reading from the current position see the image.
         self.fo.seek(self.offset)
 
     def seek(self, offset, whence=io.SEEK_SET):
