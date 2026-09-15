@@ -197,14 +197,19 @@ class SquashFSFileSystem(AbstractFileSystem):
 
     def close(self):
         """Close filesystem resources and owned archive handle."""
-        if self._closed:
+        if hasattr(self, "_closed") and self._closed:
             return
         self._closed = True
         try:
-            if hasattr(self.sfs, "close"):
+            if hasattr(self, "sfs") and hasattr(self.sfs, "close"):
                 self.sfs.close()
         finally:
-            if self._close_fo and self.fo is not None:
+            if (
+                hasattr(self, "_close_fo")
+                and self._close_fo
+                and hasattr(self, "fo")
+                and self.fo is not None
+            ):
                 self.fo.close()
 
     def __enter__(self):
