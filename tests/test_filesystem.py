@@ -191,11 +191,6 @@ def test_find(fs):
     assert fs.find("sub") == ["sub/b.txt", "sub/nested/c.bin"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the root of find(withdirs=True) is reported as '/sub' while its "
-    "children have no leading slash",
-)
 def test_find_with_dirs(fs):
     assert fs.find("sub", withdirs=True) == [
         "sub",
@@ -211,9 +206,9 @@ def test_walk(fs):
         for root, dirs, files in fs.walk("/")
     ]
     assert walked == [
-        ("/", ["sub"], ["a.txt", "link.txt"]),
-        ("/sub", ["nested"], ["b.txt"]),
-        ("/sub/nested", [], ["c.bin"]),
+        ("", ["sub"], ["a.txt", "link.txt"]),
+        ("sub", ["nested"], ["b.txt"]),
+        ("sub/nested", [], ["c.bin"]),
     ]
 
 
@@ -225,11 +220,6 @@ def test_du(fs):
     assert fs.du("/") >= expected
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="_strip_protocol roots paths at '/', but ls/find return names "
-    "without the leading slash, so glob patterns never match",
-)
 @pytest.mark.parametrize(
     ("pattern", "expected"),
     [
@@ -271,11 +261,6 @@ def test_cat_file_and_ranges(fs):
     assert fs.cat("a.txt") == A_CONTENT
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="cat() keys are the '/'-rooted _strip_protocol paths, while "
-    "ls/find/info report names without the leading slash",
-)
 def test_cat_multiple_keys_match_listing_names(fs):
     assert fs.cat(["a.txt", "sub/b.txt"]) == {
         "a.txt": A_CONTENT,
@@ -376,13 +361,14 @@ def test_symlink_loop(linky_image):
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        ("", "/"),
-        ("/", "/"),
-        ("a/b", "/a/b"),
-        ("/a/b", "/a/b"),
-        ("squashfs://a/b", "/a/b"),
-        ("squashfs:///a/b", "/a/b"),
-        ("squashfs:a/b", "/a/b"),
+        ("", ""),
+        ("/", ""),
+        ("a/b", "a/b"),
+        ("/a/b", "a/b"),
+        ("a/b/", "a/b"),
+        ("squashfs://a/b", "a/b"),
+        ("squashfs:///a/b", "a/b"),
+        ("squashfs:a/b", "a/b"),
     ],
 )
 def test_strip_protocol(raw, expected):
@@ -399,7 +385,7 @@ def test_chained_url_via_fsspec_open(image):
 def test_url_to_fs(image):
     fs, path = fsspec.core.url_to_fs(f"squashfs://sub/b.txt::{image}")
     assert isinstance(fs, SquashFSFileSystem)
-    assert path == "/sub/b.txt"
+    assert path == "sub/b.txt"
     assert fs.cat_file(path) == B_CONTENT
     fs.close()
 
