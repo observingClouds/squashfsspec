@@ -6,6 +6,7 @@ removed together with the fix.
 """
 
 # Standard library
+import gc
 import io
 import pathlib
 
@@ -403,16 +404,28 @@ def test_url_to_fs(image):
     fs.close()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="__del__ closes the archive as soon as the filesystem instance is "
-    "garbage collected, even while member files are still open",
-)
 def test_member_outlives_filesystem_reference(image):
     # Nothing but the returned file object keeps the filesystem alive here.
     f = fsspec.open(f"squashfs://a.txt::{image}").open()
+    gc.collect()
     assert f.read() == A_CONTENT
     f.close()
+
+
+def test_member_outlives_direct_filesystem_reference(image):
+    fs = SquashFSFileSystem(image)
+    f = fs.open("sub/nested/c.bin")
+    handle = fs.fo
+    del fs
+    gc.collect()
+    assert not handle.closed
+    f.seek(100)
+    assert f.read(4) == C_CONTENT[100:104]
+    f.close()
+    # With the last member closed nothing keeps the filesystem alive, so
+    # the archive handle it owned is released.
+    gc.collect()
+    assert handle.closed
 
 
 # --------------------------------------------------------------------------

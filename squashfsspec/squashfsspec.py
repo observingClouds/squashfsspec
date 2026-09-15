@@ -236,7 +236,7 @@ class SquashFSFileSystem(AbstractFileSystem):
         entry = self._get(path)
         if entry.is_dir():
             raise IsADirectoryError(path)
-        return _MemberFileProxy(entry.open())
+        return _MemberFileProxy(entry.open(), owner=self)
 
     def close(self):
         """Close filesystem resources and owned archive handle."""
@@ -264,10 +264,16 @@ class _MemberFileProxy(io.IOBase):
     """Minimal logical stream wrapper with real close semantics.
     Needed to enable closing a subfile stream without closing the entire
     SquashFS file-like object.
+
+    The proxy holds a reference to the filesystem it came from. The
+    filesystem's ``__del__`` closes the archive handle, so without this
+    reference a member could stop working as soon as the caller dropped
+    the filesystem, e.g. ``fsspec.open(url).open().read()``.
     """
 
-    def __init__(self, raw):
+    def __init__(self, raw, owner=None):
         self._raw = raw
+        self._owner = owner
 
     def readable(self):
         return not self.closed
@@ -301,6 +307,7 @@ class _MemberFileProxy(io.IOBase):
         try:
             self._raw.close()
         finally:
+            self._owner = None
             super().close()
 
     def __getattr__(self, name):
