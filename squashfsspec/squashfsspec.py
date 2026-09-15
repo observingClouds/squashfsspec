@@ -282,19 +282,41 @@ class OffsetWrapper:
     """
 
     def __init__(self, fo, offset):
+        if offset < 0:
+            raise ValueError(f"offset must be non-negative, got {offset}")
         self.fo = fo
         self.offset = offset
+        self.fo.seek(self.offset)
 
-    def seek(self, offset, whence=0):
-        if whence == 0:
-            return self.fo.seek(self.offset + offset)
-        return self.fo.seek(offset, whence)
+    def seek(self, offset, whence=io.SEEK_SET):
+        """Seek relative to the embedded image; returns the new position."""
+        if whence == io.SEEK_SET:
+            if offset < 0:
+                raise ValueError(f"negative seek position {offset}")
+            pos = self.fo.seek(self.offset + offset)
+        else:
+            pos = self.fo.seek(offset, whence)
+            if pos < self.offset:
+                pos = self.fo.seek(self.offset)
+        return pos - self.offset
 
     def read(self, size=-1):
         return self.fo.read(size)
 
+    def readinto(self, buffer):
+        return self.fo.readinto(buffer)
+
     def tell(self):
         return self.fo.tell() - self.offset
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    def writable(self):
+        return False
 
     def __enter__(self):
         return self
