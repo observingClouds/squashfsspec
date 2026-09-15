@@ -10,6 +10,10 @@
 
 - Remove `zarr` from runtime dependencies and add a `test` extra with `pytest`, `numpy`, `xarray` and `zarr` ([#31](https://github.com/observingClouds/squashfsspec/pull/31))
 
+### CI
+
+- Run the test matrix on macOS (`macos-latest`) in addition to Linux; add `osx-arm64` to the pixi platforms ([#35](https://github.com/observingClouds/squashfsspec/pull/35))
+
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
 
