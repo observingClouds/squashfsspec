@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+### Dependencies
+
+- Remove `zarr` from runtime dependencies and add a `test` extra with `pytest`, `numpy`, `xarray` and `zarr` ([#31](https://github.com/observingClouds/squashfsspec/pull/31))
+
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
 
