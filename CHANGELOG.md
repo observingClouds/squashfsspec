@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixes
+
+- Fix `requires-python` to `>=3.10` so the package installs on Python 3.14 ([#29](https://github.com/observingClouds/squashfsspec/pull/29))
+- Accept `os.PathLike` objects such as `pathlib.Path` for `fo` ([#39](https://github.com/observingClouds/squashfsspec/pull/39))
+- Make the `offset` parameter work: `OffsetWrapper` now positions the stream at the image start and reports image-relative positions from `seek` ([#41](https://github.com/observingClouds/squashfsspec/pull/41))
+
+### Dependencies
+
+- Remove `zarr` from runtime dependencies and add a `test` extra with `pytest`, `numpy`, `xarray` and `zarr` ([#31](https://github.com/observingClouds/squashfsspec/pull/31))
+- `[actions/checkout](https://github.com/actions/checkout)`: 6 → 7 ([#28](https://github.com/observingClouds/squashfsspec/pull/28))
+
+### CI
+
+- Run the test matrix on macOS (`macos-latest`) in addition to Linux; add `osx-arm64` to the pixi platforms ([#35](https://github.com/observingClouds/squashfsspec/pull/35))
+- Make the Dependabot changelog workflow re-create a missing `## Unreleased` section instead of failing, and add a pre-commit hook that requires the section ([#36](https://github.com/observingClouds/squashfsspec/pull/36))
+
+### Changes
+
+- Add MIT `LICENSE` file and declare the license in `pyproject.toml` ([#30](https://github.com/observingClouds/squashfsspec/pull/30))
+- Add author, keywords, project URLs and `squashfsspec.__version__` ([#32](https://github.com/observingClouds/squashfsspec/pull/32))
+
+### Tests
+
+- Add shared `make_squashfs` fixture and behavioural tests for listing, traversal, reading, URL handling and offsets; known defects are marked `xfail(strict=True)` ([#33](https://github.com/observingClouds/squashfsspec/pull/33))
+
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
 

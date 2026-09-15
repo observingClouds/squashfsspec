@@ -13,5 +13,29 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event.pull_request.head.ref }}
+
+    - name: Ensure CHANGELOG.md has an Unreleased section
+      run: |
+        if grep -qiE '^## \[?unreleased\]?' CHANGELOG.md; then
+          echo "CHANGELOG.md already has an Unreleased section."
+          exit 0
+        fi
+        echo "CHANGELOG.md has no Unreleased section; adding one."
+        python3 - <<'PY'
+        from pathlib import Path
+
+        path = Path("CHANGELOG.md")
+        lines = path.read_text().splitlines(keepends=True)
+        insert_at = next((i + 1 for i, line in enumerate(lines) if line.startswith("# ")), 0)
+        lines[insert_at:insert_at] = ["\n", "## Unreleased\n"]
+        path.write_text("".join(lines))
+        PY
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git commit -am "Add Unreleased section to CHANGELOG.md"
+        git push
+
     - uses: crambl/dependabot-changelog-writer@trunk

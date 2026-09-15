@@ -1,6 +1,3 @@
-# Standard library
-import subprocess
-
 # Third-party
 import pytest
 
@@ -9,7 +6,7 @@ from squashfsspec import SquashFSFileSystem
 
 
 @pytest.fixture
-def squashfs_file(tmp_path):
+def squashfs_file(tmp_path, make_squashfs):
     test_dir = tmp_path / "test_dir"
     test_dir.mkdir()
     subdir = test_dir / "subdir"
@@ -18,18 +15,7 @@ def squashfs_file(tmp_path):
     (test_dir / "file1.txt").write_text("Hello from file 1")
     (subdir / "file2.txt").write_text("Hello from file 2 in subdir")
 
-    filename = tmp_path / "test.squash"
-    # Try to find mksquashfs
-    try:
-        subprocess.run(
-            ["mksquashfs", str(test_dir), str(filename), "-noappend"],
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pytest.skip("mksquashfs not found")
-
-    return str(filename)
+    return make_squashfs(test_dir, "test.squash")
 
 
 def test_driver(squashfs_file):
