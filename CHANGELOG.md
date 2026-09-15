@@ -9,6 +9,7 @@
 ### Dependencies
 
 - Remove `zarr` from runtime dependencies and add a `test` extra with `pytest`, `numpy`, `xarray` and `zarr` ([#31](https://github.com/observingClouds/squashfsspec/pull/31))
+- `[actions/checkout](https://github.com/actions/checkout)`: 6 → 7 ([#28](https://github.com/observingClouds/squashfsspec/pull/28))
 
 ### CI
 
