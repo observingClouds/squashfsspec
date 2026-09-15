@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  # A missing mksquashfs must fail the suite in CI rather than skip it.
+  SQUASHFSSPEC_REQUIRE_MKSQUASHFS: "1"
+
 jobs:
   test:
     runs-on: ${{ matrix.os }}
