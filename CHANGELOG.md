@@ -18,6 +18,11 @@
 
 - Add MIT `LICENSE` file and declare the license in `pyproject.toml` ([#30](https://github.com/observingClouds/squashfsspec/pull/30))
 
+### Tests
+
+- Add shared `make_squashfs` fixture and behavioural tests for listing, traversal, reading, URL handling and offsets; known defects are marked `xfail(strict=True)` ([#33](https://github.com/observingClouds/squashfsspec/pull/33))
+- Fail instead of skip when `mksquashfs` is missing and `SQUASHFSSPEC_REQUIRE_MKSQUASHFS` is set; CI sets it ([#34](https://github.com/observingClouds/squashfsspec/pull/34))
+
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
 

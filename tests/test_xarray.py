@@ -1,6 +1,3 @@
-# Standard library
-import subprocess
-
 # Third-party
 import numpy as np
 import pytest
@@ -8,9 +5,8 @@ import xarray as xr
 
 
 @pytest.fixture
-def squash_path(tmp_path):
+def squash_path(tmp_path, make_squashfs):
     zarr_path = tmp_path / "test_data.zarr"
-    squash_path = tmp_path / "test_xarray.squash"
 
     # 1. Create a sample xarray dataset
     ds = xr.Dataset(
@@ -22,16 +18,7 @@ def squash_path(tmp_path):
     ds.to_zarr(str(zarr_path))
 
     # 3. Squash it
-    try:
-        subprocess.run(
-            ["mksquashfs", str(zarr_path), str(squash_path), "-noappend"],
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        pytest.skip(f"mksquashfs not available or failed: {e}")
-
-    return str(squash_path)
+    return make_squashfs(zarr_path, "test_xarray.squash")
 
 
 def test_xarray_read(squash_path):
