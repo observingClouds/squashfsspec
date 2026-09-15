@@ -16,11 +16,14 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
 ]
-dependencies = [ "fsspec", "zarr", "dissect-squashfs>=1.12,<2",
-]
-optional-dependencies.dev = [
+dependencies = [ "fsspec", "dissect-squashfs>=1.12,<2" ]
+optional-dependencies.test = [
   "pytest",
+  "numpy",
+  "xarray",
+  "zarr",
 ]
+optional-dependencies.dev = [ "squashfsspec[test]" ]
 
 [project.entry-points."fsspec.specs"]
 squashfs = "squashfsspec:SquashFSFileSystem"
