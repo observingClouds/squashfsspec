@@ -379,7 +379,6 @@ def test_offset_wrapper_translates_absolute_seeks():
     assert wrapped.read() == b"89"
     assert wrapped.seek(-2, io.SEEK_END) == 3
     assert wrapped.read() == b"89"
-    # Seeking before the image start clamps to the image start.
     assert wrapped.seek(-100, io.SEEK_CUR) == 0
     assert wrapped.read(1) == b"5"
     with pytest.raises(ValueError, match="negative seek position"):
