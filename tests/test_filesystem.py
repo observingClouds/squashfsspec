@@ -369,22 +369,40 @@ def test_member_outlives_filesystem_reference(image):
 def test_offset_wrapper_translates_absolute_seeks():
     raw = io.BytesIO(b"0123456789")
     wrapped = OffsetWrapper(raw, 5)
-    wrapped.seek(0)
+    # Construction positions the stream at the image start.
     assert wrapped.tell() == 0
     assert wrapped.read(2) == b"56"
     assert wrapped.tell() == 2
-    wrapped.seek(1, io.SEEK_CUR)
+    assert wrapped.seek(0) == 0
+    assert wrapped.read(2) == b"56"
+    assert wrapped.seek(1, io.SEEK_CUR) == 3
     assert wrapped.read() == b"89"
+    assert wrapped.seek(-2, io.SEEK_END) == 3
+    assert wrapped.read() == b"89"
+    # Seeking before the image start clamps to the image start.
+    assert wrapped.seek(-100, io.SEEK_CUR) == 0
+    assert wrapped.read(1) == b"5"
+    with pytest.raises(ValueError, match="negative seek position"):
+        wrapped.seek(-1)
+    with pytest.raises(ValueError, match="offset must be non-negative"):
+        OffsetWrapper(raw, -1)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="OffsetWrapper never seeks to its base offset, so dissect reads "
-    "the superblock from position 0 and fails",
-)
 def test_image_at_offset(image):
     padding = b"\0" * 1000
     buf = io.BytesIO(padding + pathlib.Path(image).read_bytes())
     with SquashFSFileSystem(buf, offset=1000) as fs:
         assert fs.ls("/", detail=False) == ["a.txt", "link.txt", "sub"]
         assert fs.cat_file("sub/b.txt") == B_CONTENT
+        with fs.open("sub/nested/c.bin") as f:
+            f.seek(1000)
+            assert f.read(8) == C_CONTENT[1000:1008]
+
+
+def test_image_at_offset_from_path(image, tmp_path):
+    padded = tmp_path / "padded.bin"
+    padded.write_bytes(b"\xff" * 4096 + pathlib.Path(image).read_bytes())
+    fs = fsspec.filesystem("squashfs", fo=str(padded), offset=4096)
+    assert fs.cat_file("a.txt") == A_CONTENT
+    fs.close()
+    assert fs.fo.closed
