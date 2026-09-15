@@ -13,6 +13,7 @@
 ### CI
 
 - Run the test matrix on macOS (`macos-latest`) in addition to Linux; add `osx-arm64` to the pixi platforms ([#35](https://github.com/observingClouds/squashfsspec/pull/35))
+- Make the Dependabot changelog workflow re-create a missing `## Unreleased` section instead of failing, and add a pre-commit hook that requires the section ([#36](https://github.com/observingClouds/squashfsspec/pull/36))
 
 ### Changes
 
