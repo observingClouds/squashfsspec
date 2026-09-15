@@ -1,5 +1,6 @@
 # Standard library
 import io
+import os
 
 # Third-party
 import fsspec
@@ -11,7 +12,9 @@ class SquashFSFileSystem(AbstractFileSystem):
     """Read-only fsspec filesystem for browsing SquashFS archives.
 
     Inputs:
-    - fo: path or file-like object pointing to a SquashFS image.
+    - fo: path (``str`` or ``os.PathLike``) or binary file-like object
+      pointing to a SquashFS image. A path is opened with ``fsspec.open``
+      and closed again by :meth:`close`; a file-like object is left open.
     - offset: byte offset into ``fo`` where the SquashFS image starts.
 
     Outputs:
@@ -33,6 +36,8 @@ class SquashFSFileSystem(AbstractFileSystem):
                 "SquashFSFileSystem requires 'fo' (file-like object or path)"
             )
 
+        if isinstance(fo, os.PathLike):
+            fo = os.fspath(fo)
         self._close_fo = isinstance(fo, str)
         if isinstance(fo, str):
             self._fo_ref = fsspec.open(fo, "rb")
