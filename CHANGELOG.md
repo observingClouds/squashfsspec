@@ -18,6 +18,7 @@
 ### Changes
 
 - Add MIT `LICENSE` file and declare the license in `pyproject.toml` ([#30](https://github.com/observingClouds/squashfsspec/pull/30))
+- Add author, keywords, project URLs and `squashfsspec.__version__` ([#32](https://github.com/observingClouds/squashfsspec/pull/32))
 
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release
