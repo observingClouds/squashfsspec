@@ -13,17 +13,11 @@ jobs:
       contents: write
 
     steps:
-    # Check out the PR branch itself rather than the synthetic merge commit.
-    # The changelog writer commits back to the PR branch and replaces the
-    # CHANGELOG.md blob that is on disk, so the two must be identical.
+    # The changelog writer commits back to the PR branch, so check that out, not the merge commit.
     - uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.ref }}
 
-    # The changelog writer aborts ("Could not find the specified version h2
-    # header") when CHANGELOG.md has no "## Unreleased" section, which happens
-    # right after a release consumed it. Re-create the section and push it to
-    # the PR branch before the writer runs, so it always has a target.
     - name: Ensure CHANGELOG.md has an Unreleased section
       run: |
         if grep -qiE '^## \[?unreleased\]?' CHANGELOG.md; then
@@ -36,7 +30,6 @@ jobs:
 
         path = Path("CHANGELOG.md")
         lines = path.read_text().splitlines(keepends=True)
-        # Insert directly below the top-level title, or at the top if there is none.
         insert_at = next((i + 1 for i, line in enumerate(lines) if line.startswith("# ")), 0)
         lines[insert_at:insert_at] = ["\n", "## Unreleased\n"]
         path.write_text("".join(lines))
