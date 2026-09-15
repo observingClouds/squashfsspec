@@ -16,7 +16,7 @@ jobs:
     # Check out the PR branch itself rather than the synthetic merge commit.
     # The changelog writer commits back to the PR branch and replaces the
     # CHANGELOG.md blob that is on disk, so the two must be identical.
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.ref }}
 
