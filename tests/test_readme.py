@@ -1,7 +1,6 @@
 # Standard library
 import pathlib
 import re
-import subprocess
 
 # Third-party
 import numpy as np
@@ -28,7 +27,7 @@ def _get_code_block(readme: pathlib.Path, pattern: str) -> str:
 
 
 @pytest.fixture
-def squashfs_file(tmp_path):
+def squashfs_file(tmp_path, make_squashfs):
     """SquashFS file with a nested text file for the README basic usage
     example."""
     test_dir = tmp_path / "test_dir"
@@ -36,24 +35,13 @@ def squashfs_file(tmp_path):
     (test_dir / "some").mkdir()
     (test_dir / "some" / "file.txt").write_text("Hello, SquashFS!")
 
-    filename = tmp_path / "test.squash"
-    try:
-        subprocess.run(
-            ["mksquashfs", str(test_dir), str(filename), "-noappend"],
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pytest.skip("mksquashfs not found")
-
-    return str(filename)
+    return make_squashfs(test_dir, "test.squash")
 
 
 @pytest.fixture
-def zarr_squashfs_file(tmp_path):
+def zarr_squashfs_file(tmp_path, make_squashfs):
     """SquashFS file with a Zarr store at root for the README xarray example."""
     zarr_path = tmp_path / "data.zarr"
-    squash_path = tmp_path / "data.squash"
 
     ds = xr.Dataset(
         {"temperature": (("x", "y"), np.random.rand(4, 5))},
@@ -61,25 +49,15 @@ def zarr_squashfs_file(tmp_path):
     )
     ds.to_zarr(str(zarr_path))
 
-    try:
-        subprocess.run(
-            ["mksquashfs", str(zarr_path), str(squash_path), "-noappend"],
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        pytest.skip(f"mksquashfs not available or failed: {e}")
-
-    return str(squash_path)
+    return make_squashfs(zarr_path, "data.squash")
 
 
 @pytest.fixture
-def multi_zarr_squashfs_file(tmp_path):
+def multi_zarr_squashfs_file(tmp_path, make_squashfs):
     """SquashFS file with multiple Zarr v2 stores for the README multiple
     datasets example."""
     base_dir = tmp_path / "data"
     base_dir.mkdir()
-    squash_path = tmp_path / "multidata.squash"
 
     ds1 = xr.Dataset(
         {"temperature": (("x", "y"), np.random.rand(4, 5))},
@@ -95,16 +73,7 @@ def multi_zarr_squashfs_file(tmp_path):
     ds1.to_zarr(str(base_dir / "dataset1.zarr"), zarr_format=2)
     ds2.to_zarr(str(base_dir / "dataset2.zarr"), zarr_format=2)
 
-    try:
-        subprocess.run(
-            ["mksquashfs", str(base_dir), str(squash_path), "-noappend"],
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pytest.skip("mksquashfs not available")
-
-    return str(squash_path)
+    return make_squashfs(base_dir, "multidata.squash")
 
 
 def test_readme_basic_usage(squashfs_file):
