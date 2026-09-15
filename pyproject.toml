@@ -7,7 +7,7 @@ name = "squashfsspec"
 version = "0.1.4"
 readme = "README.md"
 description = "A simple fsspec driver for SquashFS files"
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.10",
