@@ -1,6 +1,3 @@
-# Standard library
-import subprocess
-
 # Third-party
 import numpy as np
 import pytest
@@ -8,11 +5,9 @@ import xarray as xr
 
 
 @pytest.fixture
-def multi_zarr_squash(tmp_path):
+def multi_zarr_squash(tmp_path, make_squashfs):
     base_dir = tmp_path / "data"
     base_dir.mkdir()
-    squash_path = tmp_path / "test_multi.squash"
-
     # 1. Create multiple sample xarray datasets
     ds1 = xr.Dataset(
         {"foo": (("x", "y"), np.random.rand(4, 5))},
@@ -28,16 +23,7 @@ def multi_zarr_squash(tmp_path):
     ds2.to_zarr(str(base_dir / "ds2.zarr"), zarr_format=2)
 
     # 3. Squash the entire directory
-    try:
-        subprocess.run(
-            ["mksquashfs", str(base_dir), str(squash_path), "-noappend"],
-            check=True,
-            capture_output=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pytest.skip("mksquashfs not available")
-
-    return str(squash_path)
+    return make_squashfs(base_dir, "test_multi.squash")
 
 
 def test_multi_zarr_read(multi_zarr_squash):
