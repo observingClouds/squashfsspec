@@ -30,6 +30,7 @@
 ### Tests
 
 - Add shared `make_squashfs` fixture and behavioural tests for listing, traversal, reading, URL handling and offsets; known defects are marked `xfail(strict=True)` ([#33](https://github.com/observingClouds/squashfsspec/pull/33))
+- Fail instead of skip when `mksquashfs` is missing, so a broken `squashfs-tools` install cannot silently skip the image-based tests ([#34](https://github.com/observingClouds/squashfsspec/pull/34))
 
 ## v0.1.4 (2026-05-01)
 - Fixing pypi release

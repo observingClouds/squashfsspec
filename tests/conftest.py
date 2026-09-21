@@ -19,13 +19,15 @@ def make_squashfs(tmp_path) -> Callable[[pathlib.Path, str], str]:
     Output:
     - Path to the created image as ``str``.
 
-    The test is skipped when ``mksquashfs`` is not installed. A failing
-    ``mksquashfs`` invocation is a test error, not a skip.
+    The test fails when ``mksquashfs`` is not installed. It is deliberately
+    not skipped, so a broken ``squashfs-tools`` install cannot silently skip
+    the image-based part of the suite. A failing ``mksquashfs`` invocation is
+    a test error as well.
     """
 
     def _make(source: pathlib.Path, name: str = "image.squash") -> str:
         if shutil.which("mksquashfs") is None:
-            pytest.skip("mksquashfs not found")
+            pytest.fail("mksquashfs not found; install squashfs-tools")
         dest = tmp_path / name
         subprocess.run(
             ["mksquashfs", str(source), str(dest), "-noappend"],
