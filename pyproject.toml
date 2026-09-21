@@ -4,7 +4,7 @@ requires = [ "setuptools>=77" ]
 
 [project]
 name = "squashfsspec"
-version = "0.1.4"
+version = "0.1.5"
 readme = "README.md"
 description = "A simple fsspec driver for SquashFS files"
 license = "MIT"
