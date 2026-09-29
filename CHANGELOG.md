@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1.6 (2026-10-29)
+
 ### Fixes
 
 - Stop an `AttributeError` from `close()` masking the real error when `SquashFSFileSystem` construction fails, and close a file handle opened during a failed construction ([#26](https://github.com/observingClouds/squashfsspec/pull/26))
