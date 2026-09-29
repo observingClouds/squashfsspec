@@ -15,6 +15,7 @@ import fsspec
 import pytest
 
 # First-party
+import squashfsspec.squashfsspec
 from squashfsspec import OffsetWrapper, SquashFSFileSystem
 
 A_CONTENT = b"Hello from a.txt\n"
@@ -87,6 +88,38 @@ def test_pathlike_input_via_fsspec(image):
     fs = fsspec.filesystem("squashfs", fo=pathlib.Path(image))
     assert fs.isfile("a.txt")
     fs.close()
+
+
+@pytest.mark.filterwarnings("error::pytest.PytestUnraisableExceptionWarning")
+def test_invalid_image_raises_original_error():
+    with pytest.raises(ValueError, match="Invalid squashfs superblock"):
+        SquashFSFileSystem(io.BytesIO(b"not a squashfs image" * 100))
+    # Finalise the half-built instance while the warning filter is active.
+    gc.collect()
+
+
+def test_invalid_image_path_leaves_no_open_handle(tmp_path, monkeypatch):
+    path = tmp_path / "not_an_image.txt"
+    path.write_bytes(b"not a squashfs image" * 100)
+    seen = []
+    real_squashfs = squashfsspec.squashfsspec.SquashFS
+
+    def recording_squashfs(fo):
+        seen.append(fo)
+        return real_squashfs(fo)
+
+    monkeypatch.setattr(
+        squashfsspec.squashfsspec, "SquashFS", recording_squashfs
+    )
+    # Holding the traceback keeps the half-built instance alive, so only
+    # __init__ itself can have closed the handle.
+    with pytest.raises(
+        ValueError, match="Invalid squashfs superblock"
+    ) as excinfo:
+        SquashFSFileSystem(str(path))
+    assert len(seen) == 1
+    assert seen[0].closed
+    del excinfo
 
 
 # --------------------------------------------------------------------------
