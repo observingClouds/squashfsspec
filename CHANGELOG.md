@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Dependencies
+
+- `[prefix-dev/setup-pixi](https://github.com/prefix-dev/setup-pixi)`: 0.9.5 → 0.10.2 ([#46](https://github.com/observingClouds/squashfsspec/pull/46))
+
 ## v0.1.6 (2026-10-29)
 
 ### Fixes
