@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### CI
+
+- Let Dependabot also update the pre-commit hooks and the Python dependency ranges in `pyproject.toml`
+
 ## v0.1.6 (2026-10-29)
 
 ### Fixes
