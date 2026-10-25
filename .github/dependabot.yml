@@ -10,3 +10,25 @@ updates:
     gha-patches:
       update-types:
       - patch
+- package-ecosystem: pre-commit
+  directory: /
+  schedule:
+    interval: quarterly
+  cooldown:
+    default-days: 7
+  groups:
+    pre-commit-hooks:
+      patterns:
+      - '*'
+- package-ecosystem: pip
+  directory: /
+  schedule:
+    interval: quarterly
+  cooldown:
+    default-days: 7
+  # Library: widen the allowed ranges in pyproject.toml rather than pinning
+  versioning-strategy: widen
+  groups:
+    python-deps:
+      patterns:
+      - '*'
