@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### CI
+
+- Let Dependabot also update the pre-commit hooks and the Python dependency ranges in `pyproject.toml`
+
 ### Dependencies
 
 - `[prefix-dev/setup-pixi](https://github.com/prefix-dev/setup-pixi)`: 0.9.5 → 0.11.2 ([#46](https://github.com/observingClouds/squashfsspec/pull/46))
