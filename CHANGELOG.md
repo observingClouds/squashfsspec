@@ -9,6 +9,7 @@
 ### Dependencies
 
 - `[prefix-dev/setup-pixi](https://github.com/prefix-dev/setup-pixi)`: 0.9.5 → 0.11.2 ([#46](https://github.com/observingClouds/squashfsspec/pull/46))
+- `https://github.com/astral-sh/ruff-pre-commit`: v0.16.7 → 0.17.1 ([#49](https://github.com/observingClouds/squashfsspec/pull/49))
 
 ## v0.1.6 (2026-10-29)
 
