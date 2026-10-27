@@ -26,8 +26,6 @@ updates:
     interval: quarterly
   cooldown:
     default-days: 7
-  # Library: only raise a range in pyproject.toml when a new release falls
-  # outside it (pip does not support "widen")
   versioning-strategy: increase-if-necessary
   groups:
     python-deps:
