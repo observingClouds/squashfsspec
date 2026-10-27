@@ -4,7 +4,7 @@
 
 ### CI
 
-- Let Dependabot also update the pre-commit hooks and the Python dependency ranges in `pyproject.toml`
+- Let Dependabot also update the pre-commit hooks and the Python dependency ranges in `pyproject.toml` ([#47](https://github.com/observingClouds/squashfsspec/pull/47))
 
 ### Dependencies
 
