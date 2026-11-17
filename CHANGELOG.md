@@ -2,8 +2,13 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- Drop support for Python 3.10, which reached end of life; `requires-python` is now `>=3.11` ([#51](https://github.com/observingClouds/squashfsspec/issues/51))
+
 ### CI
 
+- Test on Python 3.15 and stop testing on Python 3.10 ([#51](https://github.com/observingClouds/squashfsspec/issues/51))
 - Let Dependabot also update the pre-commit hooks and the Python dependency ranges in `pyproject.toml` ([#47](https://github.com/observingClouds/squashfsspec/pull/47))
 
 ### Dependencies

@@ -5,7 +5,7 @@
 </p>
 
 [![Tests](https://github.com/observingClouds/squashfsspec/actions/workflows/test.yaml/badge.svg)](https://github.com/haukeschulz/squashfsspec/actions/workflows/test.yaml)
-[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI](https://img.shields.io/pypi/v/squashfsspec)](https://pypi.org/project/squashfsspec/)
 
