@@ -11,14 +11,14 @@ license = "MIT"
 license-files = [ "LICENSE" ]
 authors = [ { name = "squashfsspec developers" } ]
 keywords = [ "fsspec", "squashfs", "filesystem", "archive", "zarr", "xarray" ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
 ]
 dependencies = [ "fsspec", "dissect-squashfs>=1.12,<2" ]
 optional-dependencies.test = [
@@ -49,7 +49,7 @@ platforms = ["osx-64", "osx-arm64", "linux-64"]
 dask = ">=2026.3.0,<2027"
 fsspec = ">=2026.3.0,<2027"
 netcdf4 = ">=1.7.4,<2"
-python = ">=3.10,<3.15"
+python = ">=3.11,<3.16"
 squashfs-tools = ">=4.7.5,<5"
 xarray = ">=2025.6.1,<2027"
 zarr = ">=2.18.3,<4"
@@ -59,9 +59,6 @@ squashfsspec = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.dependencies]
 pytest = ">=9.0.3,<10"
-
-[tool.pixi.feature.py310.dependencies]
-python = "3.10.*"
 
 [tool.pixi.feature.py311.dependencies]
 python = "3.11.*"
@@ -75,17 +72,20 @@ python = "3.13.*"
 [tool.pixi.feature.py314.dependencies]
 python = "3.14.*"
 
+[tool.pixi.feature.py315.dependencies]
+python = "3.15.*"
+
 [tool.pixi.environments]
 default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default" }
-py310 = { features = ["dev", "py310"], solve-group = "py310" }
 py311 = { features = ["dev", "py311"], solve-group = "py311" }
 py312 = { features = ["dev", "py312"], solve-group = "py312" }
 py313 = { features = ["dev", "py313"], solve-group = "py313" }
 py314 = { features = ["dev", "py314"], solve-group = "py314" }
+py315 = { features = ["dev", "py315"], solve-group = "py315" }
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 80
 # Avoid notebook churn from lint-only modernization.
 extend-exclude = [ "docs/notebooks/*.ipynb" ]
